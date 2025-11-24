@@ -1,6 +1,7 @@
-import React, { useState, Suspense, useEffect } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { useState, Suspense, useEffect, useMemo, useRef } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
+import { Vector3 } from 'three';
 import { Earth } from './components/Earth';
 import { Satellites } from './components/Satellites';
 import { InfoPanel } from './components/InfoPanel';
@@ -21,6 +22,69 @@ const Loader = () => {
       <div className="flex flex-col items-center gap-4 text-white">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p className="font-mono text-sm animate-pulse">Initializing Global Data...</p>
+      </div>
+    </Html>
+  );
+};
+
+// Component to handle the connecting line and visual marker
+const ConnectingLine = ({ satellite }: { satellite: SatelliteData }) => {
+  const { camera, size } = useThree();
+  const vec = useMemo(() => new Vector3(), []);
+  
+  // Clean up SVG line on unmount
+  useEffect(() => {
+    return () => {
+      const el = document.getElementById('connection-line-path');
+      if (el) el.setAttribute('d', '');
+    }
+  }, []);
+
+  useFrame(() => {
+    const el = document.getElementById('connection-line-path');
+    
+    if (!satellite) {
+       if (el) el.setAttribute('d', '');
+       return;
+    }
+
+    // Calculate screen position of satellite
+    vec.set(satellite.position[0], satellite.position[1], satellite.position[2]);
+    vec.project(camera);
+
+    // Convert NDC to pixel coordinates
+    const x = (vec.x * 0.5 + 0.5) * size.width;
+    const y = (-(vec.y * 0.5) + 0.5) * size.height;
+
+    const panel = document.getElementById('info-panel-container');
+
+    if (panel && el) {
+        const rect = panel.getBoundingClientRect();
+        // Target top-left area of the panel container
+        const targetX = rect.left + 24; // Align with left padding
+        const targetY = rect.top + 24; // Align with top padding
+        
+        // Draw dashed line
+        el.setAttribute('d', `M ${x} ${y} L ${targetX} ${targetY}`);
+        el.style.opacity = '1';
+    }
+  });
+
+  return (
+    <Html 
+      position={satellite.position} 
+      zIndexRange={[0, 0]} 
+      style={{
+        pointerEvents: 'none',
+        transform: 'translate3d(-50%, -50%, 0)'
+      }}
+    >
+      <div className="relative flex items-center justify-center w-12 h-12">
+         {/* Pulsating Glow */}
+         <div className="absolute w-full h-full rounded-full border border-cyan-400/50 animate-ping"></div>
+         <div className="absolute w-8 h-8 rounded-full border border-cyan-400/80 shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>
+         {/* Center Dot */}
+         <div className="absolute w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_#ffffff]"></div>
       </div>
     </Html>
   );
@@ -60,6 +124,18 @@ export default function App() {
 
   return (
     <div className="w-full h-full relative bg-black">
+      {/* SVG Overlay for Connection Lines */}
+      <svg className="absolute inset-0 pointer-events-none z-20 w-full h-full overflow-visible">
+        <path 
+          id="connection-line-path" 
+          stroke="rgba(34, 211, 238, 0.4)" 
+          strokeWidth="1.5" 
+          strokeDasharray="4 4" 
+          fill="none" 
+          style={{ filter: 'drop-shadow(0 0 2px rgba(34, 211, 238, 0.3))', transition: 'opacity 0.2s' }} 
+        />
+      </svg>
+
       {/* Title / Header - Fades out */}
       <div className={`absolute top-8 left-0 right-0 z-10 text-center transition-opacity duration-1000 ${headerVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-600 tracking-tighter uppercase drop-shadow-lg">
@@ -113,6 +189,7 @@ export default function App() {
                 onSelect={handleSelect} 
                 onDataLoaded={setSatelliteCount}
              />
+             {lockedSatellite && <ConnectingLine satellite={lockedSatellite} />}
           </group>
           <OrbitControls 
             enablePan={false} 

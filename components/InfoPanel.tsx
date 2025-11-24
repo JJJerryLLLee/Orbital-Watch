@@ -28,7 +28,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ satellite, locked, setLock
   }
 
   return (
-    <div className={`pointer-events-auto absolute bottom-6 left-6 w-full max-w-md max-h-[80vh] flex flex-col bg-black/85 backdrop-blur-xl border border-white/20 rounded-2xl text-white transition-all duration-300 shadow-2xl ring-1 ring-white/10`}>
+    <div id="info-panel-container" className={`pointer-events-auto absolute bottom-6 left-6 w-full max-w-md max-h-[80vh] flex flex-col bg-black/85 backdrop-blur-xl border border-white/20 rounded-2xl text-white transition-all duration-300 shadow-2xl ring-1 ring-white/10`}>
       
       {/* Header (Fixed) */}
       <div className="flex-none p-6 border-b border-white/10 relative">
