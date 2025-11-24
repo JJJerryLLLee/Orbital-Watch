@@ -1,0 +1,5 @@
+{
+  "name": "Orbital Watch",
+  "description": "A 3D visualization of Earth at night, highlighting global light pollution and development. Features an interactive constellation of satellites with AI-powered details.",
+  "requestFramePermissions": []
+}
