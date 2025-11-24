@@ -1,5 +1,6 @@
 export interface SatelliteData {
   id: number;
+  name: string; // Added real name
   position: [number, number, number]; // x, y, z
   color: string;
   country: string;
@@ -17,6 +18,7 @@ export enum CountryOwner {
   Japan = 'Japan',
   SpaceX = 'SpaceX (USA)',
   Private = 'Private Corporation',
+  International = 'International',
 }
 
 export interface DetailedSatelliteInfo {

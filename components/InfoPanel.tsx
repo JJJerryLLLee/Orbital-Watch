@@ -46,10 +46,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ satellite, locked, setLock
 
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
-            {satellite.type} Sat
+            {satellite.name}
           </h2>
           <p className="text-xs text-blue-200 font-mono uppercase tracking-widest mt-1">
-            ID: SAT-{satellite.id.toString().padStart(4, '0')}
+            {satellite.type} | ID: {satellite.id}
           </p>
         </div>
       </div>

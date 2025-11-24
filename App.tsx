@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { Earth } from './components/Earth';
@@ -28,21 +28,31 @@ const Loader = () => {
 
 export default function App() {
   const [lockedSatellite, setLockedSatellite] = useState<SatelliteData | null>(null);
+  
+  // New State for features
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const [satelliteCount, setSatelliteCount] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [rotSpeed, setRotSpeed] = useState(0.5);
+  const [legendOpen, setLegendOpen] = useState(true);
+
+  // Auto-hide header after 6 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHeaderVisible(false);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // We only show the panel if a satellite is locked (clicked)
   const displaySatellite = lockedSatellite;
 
-  // We keep this empty or purely for console logging if needed, 
-  // as visual hover highlighting is handled inside the Satellites component 
-  // and we don't want the UI panel to flicker on hover anymore.
   const handleHover = (data: SatelliteData | null) => {
      // Intentionally left empty
   };
 
   const handleSelect = (data: SatelliteData) => {
-    // Direct assignment to lock/unlock
-    // If clicking the same one, we can either keep it open or toggle. 
-    // Setting it directly ensures a firm selection.
     setLockedSatellite(data);
   };
 
@@ -50,8 +60,8 @@ export default function App() {
 
   return (
     <div className="w-full h-full relative bg-black">
-      {/* Title / Header */}
-      <div className="absolute top-8 left-0 right-0 z-10 text-center pointer-events-none">
+      {/* Title / Header - Fades out */}
+      <div className={`absolute top-8 left-0 right-0 z-10 text-center transition-opacity duration-1000 ${headerVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-600 tracking-tighter uppercase drop-shadow-lg">
           Orbital Watch
         </h1>
@@ -60,39 +70,62 @@ export default function App() {
         </p>
       </div>
 
-      {/* Legend */}
-      <div className="absolute top-8 right-8 z-10 pointer-events-none hidden md:block">
-          <div className="bg-black/40 backdrop-blur border border-white/10 p-4 rounded-lg text-xs text-white space-y-2">
+      {/* Legend - Manually Toggled, does not fade automatically */}
+      <div className="absolute top-8 right-8 z-10 flex flex-col items-end gap-2 hidden md:flex">
+          {/* Toggle Button */}
+          <button 
+            onClick={() => setLegendOpen(!legendOpen)}
+            className={`
+               bg-black/40 backdrop-blur border border-white/10 px-3 py-1.5 rounded-lg text-xs text-white font-bold hover:bg-white/10 transition-all flex items-center gap-2
+               ${legendOpen ? 'text-cyan-400 border-cyan-500/30' : 'text-gray-400'}
+            `}
+          >
+             <span>Key</span>
+             <svg 
+               className={`w-3 h-3 transition-transform duration-300 ${legendOpen ? 'rotate-180' : ''}`} 
+               fill="none" viewBox="0 0 24 24" stroke="currentColor"
+             >
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+             </svg>
+          </button>
+
+          {/* Collapsible Content */}
+          <div className={`
+              bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-lg text-xs text-white space-y-2 transition-all duration-300 origin-top-right overflow-hidden shadow-lg
+              ${legendOpen ? 'opacity-100 scale-100 max-h-64' : 'opacity-0 scale-95 max-h-0 pointer-events-none border-0 p-0'}
+          `}>
             <h3 className="font-bold border-b border-white/10 pb-1 mb-2">Affiliation</h3>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500"></span> USA</div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500"></span> China</div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-700"></span> Russia</div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500"></span> EU</div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-300"></span> SpaceX</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span> USA</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span> China</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-700 shadow-[0_0_8px_rgba(185,28,28,0.6)]"></span> Russia</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></span> EU</div>
+            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-300 shadow-[0_0_8px_rgba(147,197,253,0.6)]"></span> SpaceX</div>
           </div>
       </div>
 
       {/* 3D Scene */}
-      <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
+      <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
         <Suspense fallback={<Loader />}>
-          {/* Grouping Earth and Satellites ensures visual coherence when orbiting */}
           <group>
              <Earth />
-             <Satellites onHover={handleHover} onSelect={handleSelect} />
+             <Satellites 
+                onHover={handleHover} 
+                onSelect={handleSelect} 
+                onDataLoaded={setSatelliteCount}
+             />
           </group>
-          {/* AutoRotate makes the camera spin around the center */}
           <OrbitControls 
             enablePan={false} 
             minDistance={3} 
-            maxDistance={12} 
-            autoRotate 
-            autoRotateSpeed={0.5} 
+            maxDistance={45} 
+            autoRotate={autoRotate}
+            autoRotateSpeed={rotSpeed}
             enableZoom={true}
           />
         </Suspense>
       </Canvas>
 
-      {/* Interaction Overlay */}
+      {/* Interaction Overlay (Satellite Info) */}
       <div className="absolute inset-0 pointer-events-none z-20">
          <InfoPanel 
              satellite={displaySatellite} 
@@ -100,6 +133,105 @@ export default function App() {
              setLocked={(val) => !val && unlock()}
          />
       </div>
+
+      {/* System Control Toggle Button (Bottom Right) */}
+      <div className="absolute bottom-8 right-8 z-30">
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className="group flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full hover:bg-white/20 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+          title="System Information & Settings"
+        >
+           {/* Icon changing based on state */}
+           {showSettings ? (
+             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+             </svg>
+           ) : (
+             <svg className="w-6 h-6 text-cyan-400 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+             </svg>
+           )}
+        </button>
+      </div>
+
+      {/* Settings / Info Panel Overlay */}
+      {showSettings && (
+        <div className="absolute bottom-24 right-8 z-30 w-80 bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300">
+           <div className="p-5 border-b border-white/10">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                System Status
+              </h2>
+           </div>
+           
+           <div className="p-5 space-y-6">
+              {/* Stats Section */}
+              <div className="space-y-3">
+                 <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Tracked Satellites</span>
+                    <span className="text-white font-mono font-bold text-lg">{satelliteCount}</span>
+                 </div>
+                 <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Total in Orbit (Est.)</span>
+                    <span className="text-cyan-400 font-mono">~11,300</span>
+                 </div>
+                 {/* Visual Bar */}
+                 <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" 
+                      style={{ width: `${(satelliteCount / 11300) * 100}%` }}
+                    ></div>
+                 </div>
+                 <p className="text-[10px] text-gray-500 text-right pt-1">Displaying Real-Time Simulation Dataset</p>
+              </div>
+
+              {/* Controls Section */}
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Controls</h3>
+                 
+                 {/* Rotation Toggle */}
+                 <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-300">Auto-Rotation</span>
+                    <button 
+                      onClick={() => setAutoRotate(!autoRotate)}
+                      className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${autoRotate ? 'bg-green-500' : 'bg-gray-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${autoRotate ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                 </div>
+
+                 {/* Speed Slider */}
+                 <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-400">
+                       <span>Slow</span>
+                       <span>Speed</span>
+                       <span>Fast</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="5" 
+                      step="0.1" 
+                      value={rotSpeed} 
+                      onChange={(e) => setRotSpeed(parseFloat(e.target.value))}
+                      disabled={!autoRotate}
+                      className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                    />
+                 </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Instructions</h3>
+                <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                   <li>Drag to rotate view</li>
+                   <li>Scroll to zoom in/out</li>
+                   <li>Click dots to identify satellites</li>
+                </ul>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

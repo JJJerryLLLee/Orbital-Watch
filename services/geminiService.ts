@@ -6,20 +6,24 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export const getSatelliteDetails = async (satellite: SatelliteData): Promise<string> => {
   try {
     const prompt = `
-      Generate a short, realistic, but fictional technical description for a satellite with the following parameters:
-      Owner: ${satellite.company} (${satellite.country})
-      Type: ${satellite.type}
-      Orbit Altitude: ~${satellite.altitude.toFixed(0)} km
+      Provide a factual technical summary for the real satellite named "${satellite.name}".
+      
+      Context details:
+      - Owner: ${satellite.company} (${satellite.country})
+      - Type: ${satellite.type}
+      - Orbit: ~${satellite.altitude.toFixed(0)} km altitude
 
-      Provide a 2-3 sentence summary describing its specific mission (e.g., telecommunications, spy reconnaissance, weather monitoring, scientific research) and its hypothetical launch year.
-      Make it sound scientific and professional.
+      If this is a generic member of a constellation (like "Starlink-3120"), describe the general mission and capabilities of that constellation.
+      If this is a specific famous satellite (like "Hubble" or "ISS"), provide specific details about its current status and key achievements.
+      
+      Keep the response professional, scientific, and under 80 words.
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        thinkingConfig: { thinkingBudget: 0 }, // Disable thinking for faster response
+        thinkingConfig: { thinkingBudget: 0 },
       }
     });
 
