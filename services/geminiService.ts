@@ -1,10 +1,15 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { SatelliteData } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const getSatelliteDetails = async (satellite: SatelliteData, apiKey: string): Promise<string> => {
+  if (!apiKey) {
+    return "Please configure your Google Gemini API Key in the settings (bottom right) to enable AI analysis.";
+  }
 
-export const getSatelliteDetails = async (satellite: SatelliteData): Promise<string> => {
   try {
+    // Initialize the AI client dynamically with the user-provided key
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+
     const prompt = `
       Provide a factual technical summary for the real satellite named "${satellite.name}".
       
@@ -30,6 +35,6 @@ export const getSatelliteDetails = async (satellite: SatelliteData): Promise<str
     return response.text || "Data transmission interrupted. Unable to retrieve classified details.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Connection to satellite database failed.";
+    return "Connection to satellite database failed. Please check your API Key.";
   }
 };

@@ -7,15 +7,6 @@ import { Satellites } from './components/Satellites';
 import { InfoPanel } from './components/InfoPanel';
 import { SatelliteData } from './types';
 
-// Manually declare intrinsic elements to resolve TypeScript errors
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      group: any;
-    }
-  }
-}
-
 const Loader = () => {
   return (
     <Html center>
@@ -100,6 +91,26 @@ export default function App() {
   const [autoRotate, setAutoRotate] = useState(true);
   const [rotSpeed, setRotSpeed] = useState(0.5);
   const [legendOpen, setLegendOpen] = useState(true);
+  
+  // API Key State
+  const [apiKey, setApiKey] = useState('');
+
+  // Load API Key from local storage on mount
+  useEffect(() => {
+    const storedKey = localStorage.getItem('GEMINI_API_KEY');
+    if (storedKey) {
+      setApiKey(storedKey);
+    } else {
+        // If no key, open settings automatically after a brief delay so user knows where to input it
+        setTimeout(() => setShowSettings(true), 1500);
+    }
+  }, []);
+
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newKey = e.target.value;
+    setApiKey(newKey);
+    localStorage.setItem('GEMINI_API_KEY', newKey);
+  };
 
   // Auto-hide header after 6 seconds
   useEffect(() => {
@@ -118,9 +129,16 @@ export default function App() {
 
   const handleSelect = (data: SatelliteData) => {
     setLockedSatellite(data);
+    // Stop rotation when a satellite is selected for easier reading
+    if (data) {
+        setAutoRotate(false);
+    }
   };
 
-  const unlock = () => setLockedSatellite(null);
+  const unlock = () => {
+      setLockedSatellite(null);
+      setAutoRotate(true);
+  }
 
   return (
     <div className="w-full h-full relative bg-black">
@@ -208,6 +226,8 @@ export default function App() {
              satellite={displaySatellite} 
              locked={!!lockedSatellite} 
              setLocked={(val) => !val && unlock()}
+             apiKey={apiKey}
+             onOpenSettings={() => setShowSettings(true)}
          />
       </div>
 
@@ -215,7 +235,7 @@ export default function App() {
       <div className="absolute bottom-8 right-8 z-30">
         <button 
           onClick={() => setShowSettings(!showSettings)}
-          className="group flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full hover:bg-white/20 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+          className={`group flex items-center justify-center w-12 h-12 backdrop-blur-md border rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.5)] ${!apiKey ? 'bg-red-900/50 border-red-500 animate-pulse' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}
           title="System Information & Settings"
         >
            {/* Icon changing based on state */}
@@ -224,7 +244,7 @@ export default function App() {
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
              </svg>
            ) : (
-             <svg className="w-6 h-6 text-cyan-400 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <svg className={`w-6 h-6 transition-transform duration-500 ${!apiKey ? 'text-red-400' : 'text-cyan-400 group-hover:rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
              </svg>
            )}
@@ -236,14 +256,31 @@ export default function App() {
         <div className="absolute bottom-24 right-8 z-30 w-80 bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300">
            <div className="p-5 border-b border-white/10">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span className={`w-2 h-2 rounded-full animate-pulse ${apiKey ? 'bg-green-500' : 'bg-red-500'}`}></span>
                 System Status
               </h2>
            </div>
            
            <div className="p-5 space-y-6">
+              
+              {/* API KEY INPUT */}
+              <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Google Gemini API Key</label>
+                  <input 
+                    type="password" 
+                    placeholder="Enter your API Key here..." 
+                    value={apiKey}
+                    onChange={handleApiKeyChange}
+                    className="w-full bg-black/50 border border-white/20 rounded px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500 transition-colors font-mono"
+                  />
+                  <p className="text-[10px] text-gray-500">
+                    Required for AI analysis. Key is stored locally in your browser.
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-cyan-500 hover:text-cyan-300 ml-1 underline">Get Key</a>
+                  </p>
+              </div>
+
               {/* Stats Section */}
-              <div className="space-y-3">
+              <div className="space-y-3 pt-4 border-t border-white/10">
                  <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-400">Tracked Satellites</span>
                     <span className="text-white font-mono font-bold text-lg">{satelliteCount}</span>
@@ -259,7 +296,6 @@ export default function App() {
                       style={{ width: `${(satelliteCount / 11300) * 100}%` }}
                     ></div>
                  </div>
-                 <p className="text-[10px] text-gray-500 text-right pt-1">Displaying Real-Time Simulation Dataset</p>
               </div>
 
               {/* Controls Section */}

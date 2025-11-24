@@ -3,21 +3,6 @@ import { useFrame, useLoader } from '@react-three/fiber';
 import { TextureLoader, Mesh, Color, AdditiveBlending, BackSide } from 'three';
 import { Stars } from '@react-three/drei';
 
-// Manually declare intrinsic elements to resolve TypeScript errors
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      ambientLight: any;
-      pointLight: any;
-      directionalLight: any;
-      mesh: any;
-      sphereGeometry: any;
-      meshStandardMaterial: any;
-      shaderMaterial: any;
-    }
-  }
-}
-
 export const Earth: React.FC = () => {
   const earthRef = useRef<Mesh>(null);
   const cloudsRef = useRef<Mesh>(null);

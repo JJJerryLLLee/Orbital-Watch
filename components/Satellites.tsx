@@ -3,18 +3,6 @@ import { InstancedMesh, Object3D, Color, MathUtils } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { SatelliteData, CountryOwner } from '../types';
 
-// Manually declare intrinsic elements to resolve TypeScript errors
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      instancedMesh: any;
-      boxGeometry: any;
-      sphereGeometry: any;
-      meshBasicMaterial: any;
-    }
-  }
-}
-
 interface SatellitesProps {
   onHover: (data: SatelliteData | null) => void;
   onSelect: (data: SatelliteData) => void;
