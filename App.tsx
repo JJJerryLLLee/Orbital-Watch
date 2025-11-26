@@ -87,24 +87,22 @@ const ConnectingLine = ({ satellite }: { satellite: SatelliteData }) => {
 };
 
 // Component to handle camera movement based on gestures
-const GestureCameraRig = ({ zoomState }: { zoomState: React.MutableRefObject<string> }) => {
-  const { camera } = useThree();
-  
+// Now accepts controlsRef to manipulate the OrbitControls directly
+const GestureCameraRig = ({ zoomState, controlsRef }: { zoomState: React.MutableRefObject<string>, controlsRef: React.MutableRefObject<any> }) => {
   useFrame(() => {
+    if (!controlsRef.current) return;
+
     const cmd = zoomState.current;
-    
+    const zoomSpeed = 1.02; // Multiplier for smooth zoom
+
     if (cmd === 'in') {
-      // Zoom In (Move closer to 0,0,0)
-      if (camera.position.length() > 3.5) {
-        const dir = camera.position.clone().normalize();
-        camera.position.sub(dir.multiplyScalar(0.15)); // Smooth approach
-      }
+      // Zoom In: Dolly In decreases the distance
+      controlsRef.current.dollyIn(zoomSpeed);
+      controlsRef.current.update();
     } else if (cmd === 'out') {
-      // Zoom Out (Move away)
-      if (camera.position.length() < 40) {
-        const dir = camera.position.clone().normalize();
-        camera.position.add(dir.multiplyScalar(0.15)); // Smooth retreat
-      }
+      // Zoom Out: Dolly Out increases the distance
+      controlsRef.current.dollyOut(zoomSpeed);
+      controlsRef.current.update();
     }
   });
 
@@ -129,6 +127,9 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const modelRef = useRef<any>(null);
   const zoomCmdRef = useRef('idle'); // 'in' | 'out' | 'idle'
+  
+  // Reference to OrbitControls
+  const controlsRef = useRef<any>(null);
 
   // API Key State
   const [apiKey, setApiKey] = useState('');
@@ -359,13 +360,14 @@ export default function App() {
                 onDataLoaded={setSatelliteCount}
              />
              {lockedSatellite && <ConnectingLine satellite={lockedSatellite} />}
-             <GestureCameraRig zoomState={zoomCmdRef} />
+             <GestureCameraRig zoomState={zoomCmdRef} controlsRef={controlsRef} />
           </group>
           <OrbitControls 
+            ref={controlsRef}
             enablePan={false} 
             minDistance={3} 
             maxDistance={45} 
-            autoRotate={autoRotate && !gestureMode} // Disable auto-rotate when gesture control is on
+            autoRotate={autoRotate} // Keeping autoRotate enabled even when gestureMode is active
             autoRotateSpeed={rotSpeed}
             enableZoom={true}
           />
