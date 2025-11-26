@@ -6,6 +6,11 @@ import { Earth } from './components/Earth';
 import { Satellites } from './components/Satellites';
 import { InfoPanel } from './components/InfoPanel';
 import { SatelliteData } from './types';
+// @ts-ignore
+import * as handTrackLib from 'handtrackjs';
+
+// Safe import handling for both CommonJS and ESM environments
+const handTrack = (handTrackLib as any).default || handTrackLib;
 
 const Loader = () => {
   return (
@@ -81,6 +86,31 @@ const ConnectingLine = ({ satellite }: { satellite: SatelliteData }) => {
   );
 };
 
+// Component to handle camera movement based on gestures
+const GestureCameraRig = ({ zoomState }: { zoomState: React.MutableRefObject<string> }) => {
+  const { camera } = useThree();
+  
+  useFrame(() => {
+    const cmd = zoomState.current;
+    
+    if (cmd === 'in') {
+      // Zoom In (Move closer to 0,0,0)
+      if (camera.position.length() > 3.5) {
+        const dir = camera.position.clone().normalize();
+        camera.position.sub(dir.multiplyScalar(0.15)); // Smooth approach
+      }
+    } else if (cmd === 'out') {
+      // Zoom Out (Move away)
+      if (camera.position.length() < 40) {
+        const dir = camera.position.clone().normalize();
+        camera.position.add(dir.multiplyScalar(0.15)); // Smooth retreat
+      }
+    }
+  });
+
+  return null;
+};
+
 export default function App() {
   const [lockedSatellite, setLockedSatellite] = useState<SatelliteData | null>(null);
   
@@ -92,6 +122,14 @@ export default function App() {
   const [rotSpeed, setRotSpeed] = useState(0.5);
   const [legendOpen, setLegendOpen] = useState(true);
   
+  // Gesture Control State
+  const [gestureMode, setGestureMode] = useState(false);
+  const [isModelLoading, setIsModelLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const modelRef = useRef<any>(null);
+  const zoomCmdRef = useRef('idle'); // 'in' | 'out' | 'idle'
+
   // API Key State
   const [apiKey, setApiKey] = useState('');
 
@@ -119,6 +157,107 @@ export default function App() {
     }, 6000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Gesture Control Logic
+  useEffect(() => {
+    let animationFrameId: number;
+    let isCancelled = false;
+    setCameraError(null);
+
+    const runDetection = async () => {
+      if (isCancelled || !modelRef.current || !videoRef.current) return;
+      
+      // Safety check: ensure video is actually playing and has data
+      // readyState 2 = HAVE_CURRENT_DATA, 4 = HAVE_ENOUGH_DATA
+      if (videoRef.current.readyState < 2) {
+         animationFrameId = requestAnimationFrame(runDetection);
+         return;
+      }
+
+      try {
+          const predictions = await modelRef.current.detect(videoRef.current);
+          
+          // Heuristic: Check for 'open' (Zoom In) or 'closed'/'pinch' (Zoom Out)
+          // predictions is array of objects { bbox, class, score }
+          const hand = predictions.find((p: any) => p.score > 0.65);
+          
+          if (hand) {
+            if (hand.label === 'open') {
+              zoomCmdRef.current = 'in';
+            } else if (hand.label === 'closed' || hand.label === 'pinch') {
+              zoomCmdRef.current = 'out';
+            } else {
+              zoomCmdRef.current = 'idle';
+            }
+          } else {
+            zoomCmdRef.current = 'idle';
+          }
+      } catch (e) {
+          console.warn("Detection error, retrying...", e);
+      }
+      
+      if (!isCancelled) {
+         animationFrameId = requestAnimationFrame(runDetection);
+      }
+    };
+
+    if (gestureMode) {
+      setIsModelLoading(true);
+      const modelParams = {
+         flipHorizontal: true,
+         maxNumBoxes: 1,
+         iouThreshold: 0.5,
+         scoreThreshold: 0.7,
+      };
+      
+      // Load HandTrack Model
+      handTrack.load(modelParams).then((lmodel: any) => {
+         if (isCancelled) return;
+         modelRef.current = lmodel;
+         
+         if (videoRef.current) {
+             console.log("Requesting video access...");
+             handTrack.startVideo(videoRef.current).then((status: boolean) => {
+                if (isCancelled) return;
+                setIsModelLoading(false);
+                if (status) {
+                    console.log("Video started successfully");
+                    // Start detection loop only when data is loaded
+                    if (videoRef.current!.readyState >= 2) {
+                        runDetection();
+                    } else {
+                        videoRef.current!.onloadeddata = () => {
+                            if (!isCancelled) runDetection();
+                        };
+                    }
+                } else {
+                   console.error("Camera failed to start");
+                   setCameraError("Camera access denied or failed.");
+                   setGestureMode(false);
+                }
+             }).catch((err: any) => {
+                 console.error("Camera error:", err);
+                 setCameraError("Camera error: " + err.message);
+                 setIsModelLoading(false);
+                 setGestureMode(false);
+             });
+         }
+      });
+    } else {
+       // Stop Video
+       if (videoRef.current && (videoRef.current as any).srcObject) {
+          handTrack.stopVideo(videoRef.current);
+       }
+       modelRef.current = null;
+    }
+
+    return () => {
+      isCancelled = true;
+      cancelAnimationFrame(animationFrameId);
+      if (videoRef.current) handTrack.stopVideo(videoRef.current);
+    };
+  }, [gestureMode]);
+
 
   // We only show the panel if a satellite is locked (clicked)
   const displaySatellite = lockedSatellite;
@@ -153,6 +292,18 @@ export default function App() {
           style={{ filter: 'drop-shadow(0 0 2px rgba(34, 211, 238, 0.3))', transition: 'opacity 0.2s' }} 
         />
       </svg>
+
+      {/* Hidden Video for Gesture Tracking */}
+      {/* We keep it in DOM but hidden so handtrackjs can read it */}
+      <video 
+        ref={videoRef} 
+        style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -10 }} 
+        width="640" 
+        height="480"
+        playsInline 
+        muted
+        autoPlay // CRITICAL FIX: Ensure video starts automatically
+      />
 
       {/* Title / Header - Fades out */}
       <div className={`absolute top-8 left-0 right-0 z-10 text-center transition-opacity duration-1000 ${headerVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -208,12 +359,13 @@ export default function App() {
                 onDataLoaded={setSatelliteCount}
              />
              {lockedSatellite && <ConnectingLine satellite={lockedSatellite} />}
+             <GestureCameraRig zoomState={zoomCmdRef} />
           </group>
           <OrbitControls 
             enablePan={false} 
             minDistance={3} 
             maxDistance={45} 
-            autoRotate={autoRotate}
+            autoRotate={autoRotate && !gestureMode} // Disable auto-rotate when gesture control is on
             autoRotateSpeed={rotSpeed}
             enableZoom={true}
           />
@@ -331,6 +483,31 @@ export default function App() {
                       className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                     />
                  </div>
+
+                 {/* Gesture Control Toggle */}
+                 <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                    <span className="text-sm text-gray-300 flex items-center gap-2">
+                       Gesture Control
+                       {isModelLoading && <span className="text-[10px] text-yellow-500 animate-pulse">(Init...)</span>}
+                       {gestureMode && !isModelLoading && <span className="text-[10px] text-green-500 animate-pulse">(Active)</span>}
+                    </span>
+                    <button 
+                      onClick={() => setGestureMode(!gestureMode)}
+                      className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${gestureMode ? 'bg-purple-600' : 'bg-gray-700'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${gestureMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                 </div>
+                 {gestureMode && (
+                    <div className="text-[10px] text-gray-500 bg-white/5 p-2 rounded">
+                       🤚 Open Hand = Zoom In <br/> ✊ Fist = Zoom Out
+                    </div>
+                 )}
+                 {cameraError && (
+                    <div className="text-[10px] text-red-400 bg-red-900/20 p-2 rounded border border-red-800">
+                       {cameraError}
+                    </div>
+                 )}
               </div>
 
               {/* Instructions */}
